@@ -12,7 +12,11 @@ boolean first_loop;
 void setup() {
   // put your setup code here, to run once:
 
-  Serial.begin(9600);
+  Serial.begin(2000000);
+
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH);
+
   angle_pitch = 0;
   angle_roll = 0;
   first_loop = true;
@@ -22,6 +26,8 @@ void setup() {
   setupMPU(); //just so it usees 500°/s and 8g
 
   gyroCalibration(); //it will just set global gyro_x_cal values (for the 3 axis) (values are in °/s*65.5)
+
+  digitalWrite(13, LOW);
 
   loop_timer = micros(); //loop starts from now on
 }
@@ -37,11 +43,18 @@ void loop() {
   angle_roll_output = angle_roll_output * 0.9 + angle_roll * 0.1;      //Take 90% of the output roll value and add 10% of the raw roll value
 
 
-  Serial.println(String(angle_pitch)+"   "+String(angle_roll));
  
+  if(angle_pitch_output>=20){
+    digitalWrite(13,HIGH);
+  }else{
+    digitalWrite(13,LOW);  
+  }
 
+  //Serial.println(String(angle_pitch_output)+"   "+String(angle_roll_output));
 
-
+  if(micros() - loop_timer >= 4000){
+    Serial.println("Lag");
+  }
   while(micros() - loop_timer < 4000);                                 //Wait until the loop_timer reaches 4000us (250Hz) before starting the next loop
   loop_timer = micros();                                               //Reset the loop timer
 
@@ -75,12 +88,13 @@ void readMPUdata(int raw_gyro_data[], long raw_acc_data[]){
   Wire.endTransmission();                                              //End the transmission
   Wire.requestFrom(0x68,14);                                           //Request 14 bytes from the MPU-6050
   while(Wire.available() < 14);                                        //Wait until all the bytes are received
-  raw_gyro_data[0] = Wire.read()<<8|Wire.read();                                  //Add the low and high byte to the acc_x variable
-  raw_gyro_data[1] = Wire.read()<<8|Wire.read();                                  //Add the low and high byte to the acc_y variable
-  raw_gyro_data[2] = Wire.read()<<8|Wire.read();                                  //Add the low and high byte to the acc_z variable
-  raw_acc_data[0] = Wire.read()<<8|Wire.read();                                 //Add the low and high byte to the gyro_x variable
-  raw_acc_data[1] = Wire.read()<<8|Wire.read();                                 //Add the low and high byte to the gyro_y variable
-  raw_acc_data[2] = Wire.read()<<8|Wire.read();                                 //Add the low and high byte to the gyro_z variable
+  raw_acc_data[0] = Wire.read()<<8|Wire.read();                                  //Add the low and high byte to the acc_x variable
+  raw_acc_data[1] = Wire.read()<<8|Wire.read();                                  //Add the low and high byte to the acc_y variable  
+  raw_acc_data[2] = Wire.read()<<8|Wire.read();                                  //Add the low and high byte to the acc_z variable
+  float temperature = Wire.read()<<8|Wire.read();
+  raw_gyro_data[0] = Wire.read()<<8|Wire.read();                                 //Add the low and high byte to the gyro_x variable
+  raw_gyro_data[1] = Wire.read()<<8|Wire.read();                                 //Add the low and high byte to the gyro_y variable
+  raw_gyro_data[2] = Wire.read()<<8|Wire.read();                                 //Add the low and high byte to the gyro_z variable
   
   return;
 }
@@ -110,22 +124,29 @@ void calculateQuadAngles(){
 
   raw_gyro_data[0] -= gyro_x_cal;
   raw_gyro_data[1] -= gyro_y_cal;
-  raw_gyro_data[3] -= gyro_z_cal;
+  raw_gyro_data[2] -= gyro_z_cal;
+
+  //Serial.println(String(raw_gyro_data[0]) +"   "+String(raw_gyro_data[1])+"   "+String(raw_gyro_data[2]));
 
   //Gyro angle calculations
   //0.0000611 = 1 / (250Hz / 65.5)
   angle_pitch += raw_gyro_data[0] * 0.0000611;                                   //Calculate the traveled pitch angle and add this to the angle_pitch variable
   angle_roll += raw_gyro_data[1] * 0.0000611;                                    //Calculate the traveled roll angle and add this to the angle_roll variable
 
+  
+
   //0.000001066 = 0.0000611 * (3.142(PI) / 180degr) The Arduino sin function is in radians
-  angle_pitch += angle_pitch * sin(raw_gyro_data[3] * 0.000001066);               //If the IMU has yawed transfer the roll angle to the pitch angel
-  angle_roll -= angle_roll * sin(raw_gyro_data[3] * 0.000001066);               //If the IMU has yawed transfer the pitch angle to the roll angel
+  angle_pitch += angle_roll * sin(raw_gyro_data[3] * 0.000001066);               //If the IMU has yawed transfer the roll angle to the pitch angel
+  angle_roll -= angle_pitch * sin(raw_gyro_data[3] * 0.000001066);               //If the IMU has yawed transfer the pitch angle to the roll angel
 
   //Accelerometer angle calculations
-  float acc_total_vector = sqrt((raw_acc_data[0]*raw_acc_data[0])+(raw_acc_data[1]*raw_acc_data[1])+(raw_acc_data[2]*raw_acc_data[2]));  //Calculate the total accelerometer vector
+  float acc_total_vector = sqrt( (raw_acc_data[0]*raw_acc_data[0]) + (raw_acc_data[1]*raw_acc_data[1]) + (raw_acc_data[2]*raw_acc_data[2]));  //Calculate the total accelerometer vector
+    
   //57.296 = 1 / (3.142 / 180) The Arduino asin function is in radians
-  float angle_pitch_acc = asin((float)raw_acc_data[1]/acc_total_vector)* 57.296;       //Calculate the pitch angle
-  float angle_roll_acc = asin((float)raw_acc_data[0]/acc_total_vector)* -57.296;       //Calculate the roll angle
+  float angle_pitch_acc = asin(raw_acc_data[1]/acc_total_vector)* 57.296;       //Calculate the pitch angle
+  float angle_roll_acc = asin(raw_acc_data[0]/acc_total_vector)* -57.296;       //Calculate the roll angle
+
+  //Serial.println(String(angle_pitch_acc)+"   "+String(angle_roll_acc));
 
   //Place the MPU-6050 spirit level and note the values in the following two lines for calibration
   angle_pitch_acc -= 0.0;                                              //Accelerometer calibration value for pitch
@@ -141,6 +162,6 @@ void calculateQuadAngles(){
     first_loop = false;                                            //Set the IMU started flag
   }
 
-
+  Serial.println(String(angle_pitch) +"   "+String(angle_roll));
   
 }
