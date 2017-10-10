@@ -80,8 +80,6 @@ void setup() {
   lcd.setCursor(0,0);                                                  //Set the LCD cursor to position to position 0,0
   lcd.print("Calibrating gyro");                                       //Print text to screen
   lcd.setCursor(0,1);                                                  //Set the LCD cursor to position to position 0,1
-
-  
   for (int cal_int = 0; cal_int < 2000 ; cal_int ++){                  //Run this code 2000 times
     if(cal_int % 125 == 0)lcd.print(".");                              //Print a dot on the LCD every 125 readings
     read_mpu_6050_data();                                              //Read the raw acc and gyro data from the MPU-6050
