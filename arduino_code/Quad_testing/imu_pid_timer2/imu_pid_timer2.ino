@@ -10,6 +10,21 @@ float angle_pitch_output, angle_roll_output;
 
 boolean first_loop;
 
+int reciever_pitch;
+int reciever_roll;
+
+float gyro_roll_input;
+float gyro_roll;
+
+int pid_max_roll = 400;
+int pid_i_gain_roll = 1;
+int pid_d_gain_roll = 1;
+int pid_p_gain_roll = 1;
+
+float pid_last_roll_d_error = 0;
+
+float pid_i_mem_roll = 0;
+
 void setup() {
   // put your setup code here, to run once:
 
@@ -23,6 +38,12 @@ void setup() {
   first_loop = true;
   angle_pitch_output = 0;
   angle_roll_output = 0;
+
+  reciever_pitch = 0;  //MIN=0 MAX=255
+  reciever_roll = 0;
+
+  gyro_roll_input = 0;
+  gyro_roll = 0;
 
   setupMPU(); //just so it usees 500°/s and 8g
 
@@ -40,8 +61,22 @@ void loop() {
   calculateQuadAngles(); //just setes global angle_pitch and angle_roll values to current pitch and roll of the quadcotper (vlues are in °)
 
   //To dampen the pitch and roll angles a complementary filter is used
-  angle_pitch_output = angle_pitch_output * 0.9 + angle_pitch * 0.1;   //Take 90% of the output pitch value and add 10% of the raw pitch value
-  angle_roll_output = angle_roll_output * 0.9 + angle_roll * 0.1;      //Take 90% of the output roll value and add 10% of the raw roll value
+  angle_pitch_output = angle_pitch * 15; //0-35 * 15 == 0-525
+  angle_roll_output = angle_roll * 15;     
+
+  //Serial.println(String(angle_pitch_output));
+
+  float pid_pitch_setpoint = 0; //equals revecier signal +-500 witch would mean +-35°
+  pid_pitch_setpoint -= angle_pitch_output;
+  pid_pitch_setpoint /= 3.0; //MAX(should be) = 164°/s
+
+  //Serial.println(String(pid_pitch_setpoint));
+
+  
+
+  gyro_roll_input = (gyro_roll_input * 0.7) + ((gyro_roll / 65.5) * 0.3);
+
+  calculatePID(pid_pitch_setpoint);
 
 
  
@@ -123,6 +158,9 @@ void calculateQuadAngles(){
   long raw_acc_data[] = {1,1,1};
   readMPUdata(raw_gyro_data, raw_acc_data);  
 
+  //za PID odstet
+  gyro_roll = raw_gyro_data[0];
+
   raw_gyro_data[0] -= gyro_x_cal;
   raw_gyro_data[1] -= gyro_y_cal;
   raw_gyro_data[2] -= gyro_z_cal;
@@ -163,6 +201,30 @@ void calculateQuadAngles(){
     first_loop = false;                                            //Set the IMU started flag
   }
 
-  Serial.println(String(angle_pitch) +"   "+String(angle_roll));
+  //Serial.println(String(angle_pitch) +"   "+String(angle_roll));
+  
+}
+
+
+void calculatePID(float pid_pitch_setpoint){
+
+  //Serial.println(String(gyro_roll_input)+"   "+String(pid_pitch_setpoint));
+
+  //Roll calculations
+  float pid_error_temp = gyro_roll_input - pid_pitch_setpoint; //error between mpu and reciever (0<error<1500?)    in  °/s and °/s
+  pid_i_mem_roll += pid_i_gain_roll * pid_error_temp;   // I -controler (error*I-gain)
+
+  if(pid_i_mem_roll > pid_max_roll)pid_i_mem_roll = pid_max_roll; //to prevent it going out of conrol we need to limit it
+  else if(pid_i_mem_roll < pid_max_roll * -1)pid_i_mem_roll = pid_max_roll * -1; //MAX == 400
+
+  //complete PID is calculated (error*P_gain)+(I_controler)+((error-last_error)*D_gain)
+  float pid_output_roll = pid_p_gain_roll * pid_error_temp + pid_i_mem_roll + pid_d_gain_roll * (pid_error_temp - pid_last_roll_d_error);
+  // P and D may still cause some extreme outputs so they are limited to MAX (400ms pusle)
+  if(pid_output_roll > pid_max_roll)pid_output_roll = pid_max_roll;
+  else if(pid_output_roll < pid_max_roll * -1)pid_output_roll = pid_max_roll * -1;
+
+  pid_last_roll_d_error = pid_error_temp;// just for the D_controller
+
+  Serial.println(String(pid_output_roll));
   
 }
