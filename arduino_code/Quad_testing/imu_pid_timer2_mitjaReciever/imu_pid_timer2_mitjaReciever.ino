@@ -136,8 +136,8 @@ void readMPUdata(int raw_gyro_data[], long raw_acc_data[]){
 }
 
 void gyroCalibration(){
-  int raw_gyro_data[] = {1,1,1,};
-  long raw_acc_data[] = {1,1,1,};
+  int raw_gyro_data[] = {1,1,1};
+  long raw_acc_data[] = {1,1,1};
     
   for (int cal_int = 0; cal_int < 2000 ; cal_int ++){                  //Run this code 2000 times
     readMPUdata(raw_gyro_data, raw_acc_data);                                             //Read the raw acc and gyro data from the MPU-6050
