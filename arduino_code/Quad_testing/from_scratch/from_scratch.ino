@@ -40,29 +40,31 @@ void setup() {
   
   //Timer 2 seup
   //#PWM pins of Timer 2 must be set to OUTPUT for Timer to that is OC2A(PIN10), OC2B(PIN9)
-  DDRB |= _BV(PORTB4);
-  DDRH |= (_BV(PORTH6) | _BV(PORTH5) | _BV(PORTH4) | _BV(PORTH3));
-  //Setup for fast PWM mode
-  TCCR2A = 10100011;
-  //Prescaler Setup (Fastest Mode)
-  TCCR2B = 00000001;
-  //Set Compare Registers to 0;
-  //OCR2A = 255;
-  OCR2B = 255;
-
+ 
+  DDRH |= (_BV(PORTH5) | _BV(PORTH4));
   TCCR4A = 10100011;
   //Prescaler Setup (Fastest Mode)
   TCCR4B = 00000001;
-  OCR4C = 32767;
-  OCR4B = 32767;
-  //OCR4A = 32767;
+  OCR4C = 32767/5;
+  OCR4B = 32767/10;
 
-  DDRE |= _BV(PORTE5);
+  DDRE |= ( _BV(PORTE5) | _BV(PORTE4) );
   TCCR3A = 10100011;
   //Prescaler Setup (Fastest Mode)
   TCCR3B = 00000001;
-  OCR3C = 32767;
+  OCR3C = 0;
+  OCR3B = 32767;
 
+
+
+  //Setup MPU
+  Wire.begin();
+  Wire.write(0x02);
+  Wire.transfer();
+
+  Wire.
+
+  
   
 
 }
@@ -75,3 +77,7 @@ void loop() {
 void setupMPU(){
     
 }
+
+
+
+
